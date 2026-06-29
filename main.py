@@ -651,6 +651,86 @@ Tu reçois juste les notifications.
  
         print(f"✅ Prix: {state.last_price} | DXY: {state.dxy_prices[-1]:.2f} | US10Y: {state.us10y_val:.2f}%")
  
+        # ═══ DIAGNOSTIC COMPLET AU DÉMARRAGE ═══
+        diag = []
+ 
+        # 1. Test prix OKX
+        test_price = await get_gold_price(http)
+        if test_price and test_price > 1000:
+            diag.append(("✅", f"Prix OKX connecté : <b>{test_price}$</b>"))
+        else:
+            diag.append(("❌", "Prix OKX — connexion échouée"))
+ 
+        # 2. Test DXY
+        if state.dxy_prices and state.dxy_prices[-1] > 0:
+            diag.append(("✅", f"DXY connecté : <b>{state.dxy_prices[-1]:.2f}</b>"))
+        else:
+            diag.append(("❌", "DXY — données non reçues"))
+ 
+        # 3. Test US10Y
+        if state.us10y_val > 0:
+            diag.append(("✅", f"US10Y connecté : <b>{state.us10y_val:.2f}%</b>"))
+        else:
+            diag.append(("❌", "US10Y — données non reçues"))
+ 
+        # 4. Test API OKX — vérifier solde
+        try:
+            path = "/api/v5/account/balance?ccy=USDC"
+            async with http.get(
+                OKX_BASE_URL + path,
+                headers=okx_headers("GET", path),
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as r:
+                data = await r.json()
+                if data.get("code") == "0":
+                    balance = float(data["data"][0]["details"][0]["availBal"]) if data["data"][0].get("details") else 0
+                    diag.append(("✅", f"API OKX connectée — Solde USDC : <b>{balance:.2f}$</b>"))
+                else:
+                    diag.append(("⚠️", f"API OKX — {data.get('msg', 'Erreur inconnue')}"))
+        except Exception as e:
+            diag.append(("❌", f"API OKX — {str(e)[:50]}"))
+ 
+        # 5. Session actuelle
+        session = detect_session()
+        if session["active"]:
+            diag.append(("✅", f"Session <b>{session['name']}</b> {session['emoji']} — Trading actif"))
+        else:
+            diag.append(("⚠️", f"Session <b>{session['name']}</b> — Liquidité faible"))
+ 
+        # 6. Symbole OKX
+        try:
+            url = f"{OKX_BASE_URL}/api/v5/market/ticker?instId={SYMBOL}"
+            async with http.get(url, timeout=aiohttp.ClientTimeout(total=8)) as r:
+                data = await r.json()
+                if data.get("code") == "0":
+                    last = float(data["data"][0]["last"])
+                    diag.append(("✅", f"Symbole <b>{SYMBOL}</b> disponible @ {last}$"))
+                else:
+                    diag.append(("❌", f"Symbole {SYMBOL} non disponible sur OKX"))
+        except:
+            diag.append(("❌", f"Symbole {SYMBOL} — vérification échouée"))
+ 
+        # Construire le message diagnostic
+        diag_lines = "\n".join([f"{icon} {msg}" for icon, msg in diag])
+        all_ok = all(icon == "✅" for icon, _ in diag)
+        status = "🟢 <b>TOUT EST OPÉRATIONNEL</b>" if all_ok else "🟡 <b>OPÉRATIONNEL AVEC AVERTISSEMENTS</b>"
+ 
+        await send_telegram(http, f"""🔍 <b>DIAGNOSTIC SYSTÈME</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+{diag_lines}
+━━━━━━━━━━━━━━━━━━━━━━━━
+{status}
+ 
+📊 <b>Paramètres actifs :</b>
+→ Symbole : {SYMBOL}
+→ Score min : {MIN_SCORE}/100
+→ Scan : toutes les secondes
+→ Levier : dynamique 2x-10x
+→ Risque/trade : {RISK_PERCENT}% du capital
+→ Timeout : 15 min
+ 
+<i>Je commence l'analyse XAUUSD...</i>""")
+ 
         tick = 0
  
         while state.running:
@@ -774,3 +854,4 @@ Tu reçois juste les notifications.
  
 if __name__ == "__main__":
     asyncio.run(main())
+ 
