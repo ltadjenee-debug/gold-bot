@@ -1,3 +1,4 @@
+
 """
 ╔══════════════════════════════════════════════════════════════════╗
 ║     XAUUSD ULTIMATE SCALPING BOT — VERSION 3.0 AUTO TRADE       ║
@@ -746,8 +747,31 @@ Tu reçois juste les notifications.
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                print(f"❌ Erreur: {e}")
-                await asyncio.sleep(5)
+                error_msg = str(e)
+                print(f"❌ Erreur: {error_msg}")
+ 
+                # Diagnostic automatique
+                if "401" in error_msg or "Invalid" in error_msg or "sign" in error_msg.lower():
+                    advice = "🔑 Problème de clé API OKX\n→ Vérifie OKX_API_KEY, OKX_SECRET, OKX_PASSPHRASE dans Railway Variables"
+                elif "429" in error_msg or "rate" in error_msg.lower():
+                    advice = "⏱️ Trop de requêtes\n→ Aucune action requise, reprise automatique dans 60s"
+                elif "connect" in error_msg.lower() or "timeout" in error_msg.lower():
+                    advice = "🌐 Problème de connexion internet\n→ Vérifie que Railway est bien actif\n→ Redémarre le service si ça dure"
+                elif "insufficient" in error_msg.lower() or "balance" in error_msg.lower():
+                    advice = "💰 Solde OKX insuffisant\n→ Recharge ton compte OKX démo ou réel"
+                elif "position" in error_msg.lower():
+                    advice = "📊 Problème de position\n→ Vérifie sur OKX si une position est déjà ouverte\n→ Ferme-la manuellement si besoin"
+                else:
+                    advice = f"⚠️ Erreur inconnue\n→ Redémarre le service Railway si ça persiste"
+ 
+                await send_telegram(http, f"""🚨 <b>ERREUR DÉTECTÉE — BOT EN PAUSE</b>
+ 
+❌ <b>Erreur :</b> <code>{error_msg[:200]}</code>
+ 
+{advice}
+ 
+⏳ <i>Reprise automatique dans 30 secondes...</i>""")
+                await asyncio.sleep(30)
  
 if __name__ == "__main__":
     asyncio.run(main())
