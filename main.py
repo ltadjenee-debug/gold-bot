@@ -1,4 +1,3 @@
-
 """
 ╔══════════════════════════════════════════════════════════════════╗
 ║     XAUUSD ULTIMATE SCALPING BOT — VERSION 3.0 AUTO TRADE       ║
@@ -121,16 +120,23 @@ async def okx_place_order(session, direction, size, sl, tp, entry_price=0):
     side = "buy" if direction == "BUY" else "sell"
     pos_side = "long" if direction == "BUY" else "short"
  
-    # Vérification SL/TP cohérents
-    sl = round(sl, 2)
-    tp = round(tp, 2)
+    # Correction SL/TP forcée selon direction
+    entry_price = float(entry_price)
+    sl = float(sl)
+    tp = float(tp)
     
     if direction == "BUY":
-        if sl >= float(entry_price): sl = round(float(entry_price) - 1.5, 2)
-        if tp <= float(entry_price): tp = round(float(entry_price) + 2.0, 2)
+        sl = round(entry_price - abs(entry_price - sl), 2)
+        tp = round(entry_price + abs(entry_price - tp), 2)
+        # Sécurité absolue
+        if sl >= entry_price: sl = round(entry_price - 2.0, 2)
+        if tp <= entry_price: tp = round(entry_price + 3.0, 2)
     else:
-        if sl <= float(entry_price): sl = round(float(entry_price) + 1.5, 2)
-        if tp >= float(entry_price): tp = round(float(entry_price) - 2.0, 2)
+        sl = round(entry_price + abs(entry_price - sl), 2)
+        tp = round(entry_price - abs(entry_price - tp), 2)
+        # Sécurité absolue
+        if sl <= entry_price: sl = round(entry_price + 2.0, 2)
+        if tp >= entry_price: tp = round(entry_price - 3.0, 2)
  
     body = json.dumps({
         "instId": SYMBOL,
@@ -868,4 +874,3 @@ Tu reçois juste les notifications.
  
 if __name__ == "__main__":
     asyncio.run(main())
- 
