@@ -26,7 +26,7 @@ CHAT_ID = "808538037"
 OKX_API_KEY    = os.environ.get("OKX_API_KEY", "")
 OKX_SECRET     = os.environ.get("OKX_SECRET", "")
 OKX_PASSPHRASE = os.environ.get("OKX_PASSPHRASE", "")
-OKX_BASE_URL   = "https://www.okx.com"
+OKX_BASE_URL   = "https://eea.okx.com"
  
 ACCOUNT_SIZE         = 100
 RISK_PERCENT         = 2.0
