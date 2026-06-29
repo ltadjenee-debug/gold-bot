@@ -1,3 +1,4 @@
+
 """
 ╔══════════════════════════════════════════════════════════════════╗
 ║     XAUUSD ULTIMATE SCALPING BOT — VERSION 3.0 AUTO TRADE       ║
@@ -33,7 +34,7 @@ RISK_PERCENT         = 2.0
 TRADE_AMOUNT_PERCENT = 10
 MIN_SCORE            = 78
 MAX_TRADE_DURATION   = 15 * 60
-SYMBOL               = "XAU-USDC-SWAP"  # Contrat perpétuel OKX
+SYMBOL               = "XAU-USDT-SWAP"  # Contrat perpétuel OKX
  
 LEVERAGE_TABLE = [
     (97, 101, 10, "SETUP EN BÉTON",   "💎"),
@@ -99,7 +100,7 @@ async def okx_set_leverage(session, leverage):
     body = json.dumps({
         "instId": SYMBOL,
         "lever": str(leverage),
-        "mgnMode": "isolated"
+        "mgnMode": "cross"
     })
     try:
         async with session.post(
@@ -122,7 +123,8 @@ async def okx_place_order(session, direction, size, sl, tp):
  
     body = json.dumps({
         "instId": SYMBOL,
-        "tdMode": "isolated",
+        "tdMode": "cross",
+        "ccy": "USDC",
         "side": side,
         "posSide": pos_side,
         "ordType": "market",
@@ -157,7 +159,7 @@ async def okx_close_position(session, direction):
     pos_side = "long" if direction == "BUY" else "short"
     body = json.dumps({
         "instId": SYMBOL,
-        "mgnMode": "isolated",
+        "mgnMode": "cross",
         "posSide": pos_side,
     })
     try:
