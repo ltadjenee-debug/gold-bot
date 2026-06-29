@@ -707,7 +707,7 @@ Tu reçois juste les notifications.
                         print(f"✅ Fermé: {exit_info['reason']} | PnL: {exit_info['pnl']:.2f}")
  
                 # PAS EN TRADE — scan
-                elif tick % 20 == 0:
+                elif tick % 1 == 0:
                     session = detect_session()
                     if not session["active"]:
                         if tick % 120 == 0: print(f"😴 {session['name']} — pause")
@@ -774,4 +774,3 @@ Tu reçois juste les notifications.
  
 if __name__ == "__main__":
     asyncio.run(main())
- 
