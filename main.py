@@ -1,4 +1,3 @@
-
 """
 ╔══════════════════════════════════════════════════════════════════╗
 ║     XAUUSD ULTIMATE SCALPING BOT — VERSION 3.0 AUTO TRADE       ║
@@ -34,7 +33,7 @@ RISK_PERCENT         = 2.0
 TRADE_AMOUNT_PERCENT = 10
 MIN_SCORE            = 78
 MAX_TRADE_DURATION   = 15 * 60
-SYMBOL               = "XAU-USDT-SWAP"  # Contrat perpétuel OKX
+SYMBOL               = "XAU-USDC-SWAP"  # Contrat perpétuel OKX
  
 LEVERAGE_TABLE = [
     (97, 101, 10, "SETUP EN BÉTON",   "💎"),
@@ -775,4 +774,4 @@ Tu reçois juste les notifications.
  
 if __name__ == "__main__":
     asyncio.run(main())
-
+ 
