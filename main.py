@@ -146,10 +146,16 @@ async def okx_place_order(session, direction, size, sl, tp, entry_price=0):
         "posSide": pos_side,
         "ordType": "market",
         "sz": str(size),
-        "slTriggerPx": str(sl),
-        "slOrdPx": "-1",
-        "tpTriggerPx": str(tp),
-        "tpOrdPx": "-1",
+        "attachAlgoOrds": [
+            {
+                "slTriggerPx": str(sl),
+                "slOrdPx": "-1",
+                "slTriggerPxType": "last",
+                "tpTriggerPx": str(tp),
+                "tpOrdPx": "-1",
+                "tpTriggerPxType": "last"
+            }
+        ]
     })
     try:
         async with session.post(
