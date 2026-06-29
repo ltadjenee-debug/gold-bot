@@ -4,7 +4,7 @@
 ║        100% AUTOMATIQUE — OKX API — LEVIER DYNAMIQUE            ║
 ╚══════════════════════════════════════════════════════════════════╝
 """
- 
+
 import os
 import asyncio
 import aiohttp
@@ -16,38 +16,38 @@ import hashlib
 import base64
 import json
 from datetime import datetime, timezone, timedelta
- 
+
 # ═══════════════════════════════════════════════════════════════
 # CONFIG
 # ═══════════════════════════════════════════════════════════════
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "TON_TOKEN_ICI")
 CHAT_ID = "808538037"
- 
+
 OKX_API_KEY    = os.environ.get("OKX_API_KEY", "")
 OKX_SECRET     = os.environ.get("OKX_SECRET", "")
 OKX_PASSPHRASE = os.environ.get("OKX_PASSPHRASE", "")
 OKX_BASE_URL   = "https://eea.okx.com"
- 
+
 ACCOUNT_SIZE         = 100
 RISK_PERCENT         = 2.0
 TRADE_AMOUNT_PERCENT = 10
 MIN_SCORE            = 78
 MAX_TRADE_DURATION   = 15 * 60
 SYMBOL               = "XAU-USDT-SWAP"  # Contrat perpétuel OKX
- 
+
 LEVERAGE_TABLE = [
     (97, 101, 10, "SETUP EN BÉTON",   "💎"),
     (92, 97,   5, "TRÈS FORT SETUP",  "🔥🔥"),
     (85, 92,   3, "BON SETUP",        "🔥"),
     (78, 85,   2, "SETUP CORRECT",    "⚡"),
 ]
- 
+
 def get_leverage(score):
     for low, high, lev, label, emoji in LEVERAGE_TABLE:
         if low <= score < high:
             return lev, label, emoji
     return 2, "SETUP CORRECT", "⚡"
- 
+
 # ═══════════════════════════════════════════════════════════════
 # ÉTAT
 # ═══════════════════════════════════════════════════════════════
@@ -68,9 +68,9 @@ class BotState:
         self.dxy_prices = []
         self.us10y_val = 4.3
         self.okx_order_id = None
- 
+
 state = BotState()
- 
+
 # ═══════════════════════════════════════════════════════════════
 # OKX API — SIGNATURE
 # ═══════════════════════════════════════════════════════════════
@@ -78,7 +78,7 @@ def okx_sign(timestamp, method, path, body=""):
     msg = f"{timestamp}{method}{path}{body}"
     mac = hmac.new(OKX_SECRET.encode(), msg.encode(), hashlib.sha256)
     return base64.b64encode(mac.digest()).decode()
- 
+
 def okx_headers(method, path, body=""):
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
     return {
@@ -89,7 +89,7 @@ def okx_headers(method, path, body=""):
         "Content-Type": "application/json",
         # Mode réel — prix OKX directs
     }
- 
+
 # ═══════════════════════════════════════════════════════════════
 # OKX — ACTIONS DE TRADING
 # ═══════════════════════════════════════════════════════════════
@@ -113,13 +113,13 @@ async def okx_set_leverage(session, leverage):
     except Exception as e:
         print(f"❌ Set leverage error: {e}")
         return False
- 
+
 async def okx_place_order(session, direction, size, sl, tp, entry_price=0):
     """Place un ordre sur OKX avec SL et TP"""
     path = "/api/v5/trade/order"
     side = "buy" if direction == "BUY" else "sell"
     pos_side = "long" if direction == "BUY" else "short"
- 
+
     # Correction SL/TP forcée selon direction
     entry_price = float(entry_price)
     sl = float(sl)
@@ -137,7 +137,7 @@ async def okx_place_order(session, direction, size, sl, tp, entry_price=0):
         # Sécurité absolue
         if sl <= entry_price: sl = round(entry_price + 2.0, 2)
         if tp >= entry_price: tp = round(entry_price - 3.0, 2)
- 
+
     body = json.dumps({
         "instId": SYMBOL,
         "tdMode": "cross",
@@ -169,7 +169,7 @@ async def okx_place_order(session, direction, size, sl, tp, entry_price=0):
     except Exception as e:
         print(f"❌ Place order error: {e}")
         return None
- 
+
 async def okx_close_position(session, direction):
     """Ferme la position OKX"""
     path = "/api/v5/trade/close-position"
@@ -191,7 +191,7 @@ async def okx_close_position(session, direction):
     except Exception as e:
         print(f"❌ Close position error: {e}")
         return False
- 
+
 async def okx_get_position(session):
     """Récupère la position ouverte"""
     path = f"/api/v5/account/positions?instId={SYMBOL}"
@@ -207,7 +207,7 @@ async def okx_get_position(session):
     except Exception as e:
         print(f"❌ Get position error: {e}")
     return None
- 
+
 # ═══════════════════════════════════════════════════════════════
 # PRIX EN TEMPS RÉEL
 # ═══════════════════════════════════════════════════════════════
@@ -234,7 +234,7 @@ async def get_gold_price(session):
         pass
     base = state.last_price if state.last_price > 0 else 4073.0
     return round(base + (random.random() - 0.499) * 0.6, 2)
- 
+
 async def get_dxy_price(session):
     try:
         url = "https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB"
@@ -246,7 +246,7 @@ async def get_dxy_price(session):
     except:
         pass
     return 101.3
- 
+
 async def get_us10y(session):
     try:
         url = "https://query1.finance.yahoo.com/v8/finance/chart/%5ETNX"
@@ -258,7 +258,7 @@ async def get_us10y(session):
     except:
         pass
     return 4.37
- 
+
 # ═══════════════════════════════════════════════════════════════
 # INDICATEURS
 # ═══════════════════════════════════════════════════════════════
@@ -270,7 +270,7 @@ def calc_ema(prices, period):
     for p in prices[period:]:
         ema = p * k + ema * (1 - k)
     return round(ema, 2)
- 
+
 def calc_rsi(prices, period=14):
     if len(prices) < period + 1:
         return 50
@@ -281,13 +281,13 @@ def calc_rsi(prices, period=14):
         else: losses -= diff
     rs = gains / (losses if losses > 0 else 0.001)
     return round(100 - 100 / (1 + rs), 1)
- 
+
 def calc_atr(prices, period=14):
     if len(prices) < 2:
         return 1.5
     trs = [abs(prices[i] - prices[i-1]) for i in range(max(1, len(prices)-period), len(prices))]
     return round(sum(trs) / len(trs), 2) if trs else 1.5
- 
+
 def calc_macd(prices):
     if len(prices) < 26:
         return {"hist": 0}
@@ -295,7 +295,7 @@ def calc_macd(prices):
     ema26 = calc_ema(prices, 26)
     macd = ema12 - ema26
     return {"macd": round(macd, 3), "hist": round(macd * 0.1, 3)}
- 
+
 def calc_bollinger(prices, period=20):
     if len(prices) < period:
         p = prices[-1] if prices else 4073
@@ -304,13 +304,13 @@ def calc_bollinger(prices, period=20):
     mid = sum(sl) / period
     std = math.sqrt(sum((x-mid)**2 for x in sl) / period)
     return {"upper": round(mid+2*std, 2), "middle": round(mid, 2), "lower": round(mid-2*std, 2)}
- 
+
 def calc_volume_ratio(volumes):
     if len(volumes) < 5:
         return 1.0
     ma = sum(volumes[-20:]) / min(20, len(volumes))
     return round(volumes[-1] / ma if ma > 0 else 1.0, 1)
- 
+
 def detect_candle_pattern(prices):
     if len(prices) < 3:
         return None, 0
@@ -327,14 +327,14 @@ def detect_candle_pattern(prices):
     if lower_wick > body2*3 and c3 > c1: patterns.append("Pin Bar Haussier 📌"); score += 16
     if upper_wick > body2*3 and c3 < c1: patterns.append("Pin Bar Baissier 📌"); score += 16
     return (", ".join(patterns), score) if patterns else (None, 0)
- 
+
 def detect_session():
     h = datetime.now(timezone.utc).hour
     if 13 <= h < 17: return {"name": "OVERLAP LDN/NY", "emoji": "🔥", "score_bonus": 20, "active": True}
     elif 7 <= h < 13: return {"name": "LONDON", "emoji": "🇬🇧", "score_bonus": 12, "active": True}
     elif 17 <= h < 21: return {"name": "NEW YORK", "emoji": "🗽", "score_bonus": 10, "active": True}
     else: return {"name": "ASIA", "emoji": "🌏", "score_bonus": 2, "active": False}
- 
+
 def detect_liquidity_sweep(prices):
     if len(prices) < 25: return None
     recent = prices[-25:]
@@ -343,7 +343,7 @@ def detect_liquidity_sweep(prices):
     if prev > high and last < high-0.1: return {"type": "BULL_SWEEP", "level": round(high,2)}
     if prev < low and last > low+0.1: return {"type": "BEAR_SWEEP", "level": round(low,2)}
     return None
- 
+
 def detect_fvg(prices):
     if len(prices) < 3: return None
     c1, c2, c3 = prices[-3], prices[-2], prices[-1]
@@ -351,7 +351,7 @@ def detect_fvg(prices):
     if gap > 0.8:
         return {"type": "BULLISH_FVG" if c3>c1 else "BEARISH_FVG", "gap": round(gap,2)}
     return None
- 
+
 def detect_order_block(prices):
     if len(prices) < 15: return None
     sl = prices[-15:]
@@ -360,32 +360,32 @@ def detect_order_block(prices):
     if last < max_v-1.5: return {"type": "BEARISH_OB", "level": round(max_v,2)}
     if last > min_v+1.5: return {"type": "BULLISH_OB", "level": round(min_v,2)}
     return None
- 
+
 def get_psych_levels(price):
     l50_up = math.ceil(price/50)*50
     l50_dn = math.floor(price/50)*50
     return {"above": round(l50_up,2), "below": round(l50_dn,2),
             "dist_up": round(l50_up-price,2), "dist_dn": round(price-l50_dn,2)}
- 
+
 def analyze_dxy(dxy_prices):
     if len(dxy_prices) < 3: return "NEUTRE", 0
     trend = dxy_prices[-1] - dxy_prices[0]
     if trend > 0.3: return "HAUSSE 📈", -15
     elif trend < -0.3: return "BAISSE 📉", +12
     return "NEUTRE", 0
- 
+
 def analyze_us10y(val):
     if val > 4.5: return "ÉLEVÉ 🔴", -10
     elif val < 4.0: return "BAS 🟢", +8
     return "NEUTRE ⚪", 0
- 
+
 def is_news_blackout():
     if state.news_blackout_until:
         if datetime.now(timezone.utc) < state.news_blackout_until:
             rem = (state.news_blackout_until - datetime.now(timezone.utc)).seconds // 60
             return True, rem
     return False, 0
- 
+
 def check_news():
     now = datetime.now(timezone.utc)
     h, m, dow = now.hour, now.minute, now.weekday()
@@ -393,14 +393,14 @@ def check_news():
     if dow == 1 and 8 <= now.day <= 14 and h == 13 and 25 <= m <= 45: return "CPI 🔴"
     if h == 18 and m <= 30 and dow in [2,3]: return "FOMC 🔴"
     return None
- 
+
 # ═══════════════════════════════════════════════════════════════
 # MOTEUR DE SCORE
 # ═══════════════════════════════════════════════════════════════
 def score_signal():
     prices = state.prices
     if len(prices) < 50: return None
- 
+
     price = prices[-1]
     rsi = calc_rsi(prices)
     macd = calc_macd(prices)
@@ -419,26 +419,26 @@ def score_signal():
     dxy_trend, dxy_score = analyze_dxy(state.dxy_prices)
     us10y_status, us10y_score = analyze_us10y(state.us10y_val)
     vol_ratio = calc_volume_ratio(state.volumes)
- 
+
     score = 0
     reasons = []
     direction = "BUY" if price > ema50 else "SELL"
- 
+
     macro_score = dxy_score if direction=="BUY" else -dxy_score
     score += macro_score
     if dxy_score != 0: reasons.append(f"DXY {dxy_trend}")
- 
+
     y_score = us10y_score if direction=="BUY" else -us10y_score
     score += y_score
     if us10y_score != 0: reasons.append(f"US10Y {us10y_status}")
- 
+
     if (price > ema200 and direction=="BUY") or (price < ema200 and direction=="SELL"):
         score += 10; reasons.append("EMA200 confirmée")
     if (price > ema50 and direction=="BUY") or (price < ema50 and direction=="SELL"):
         score += 8; reasons.append("EMA50 confirmée")
     if (ema9 > ema21 and direction=="BUY") or (ema9 < ema21 and direction=="SELL"):
         score += 10; reasons.append("EMA9/21 croisées")
- 
+
     if direction=="BUY":
         if rsi < 35: score += 18; reasons.append(f"RSI survendu ({rsi}) 🔥")
         elif rsi < 45: score += 12; reasons.append(f"RSI survendu ({rsi})")
@@ -447,18 +447,18 @@ def score_signal():
         if rsi > 65: score += 18; reasons.append(f"RSI suracheté ({rsi}) 🔥")
         elif rsi > 55: score += 12; reasons.append(f"RSI suracheté ({rsi})")
         elif rsi < 30: score -= 15
- 
+
     if (macd["hist"] > 0.05 and direction=="BUY") or (macd["hist"] < -0.05 and direction=="SELL"):
         score += 10; reasons.append("MACD confirmé")
- 
+
     if direction=="BUY" and price <= boll["lower"]:
         score += 14; reasons.append("BB inférieure 🔥")
     elif direction=="SELL" and price >= boll["upper"]:
         score += 14; reasons.append("BB supérieure 🔥")
- 
+
     score += session["score_bonus"]
     if session["active"]: reasons.append(f"{session['emoji']} {session['name']}")
- 
+
     if sweep:
         if (sweep["type"]=="BULL_SWEEP" and direction=="BUY") or (sweep["type"]=="BEAR_SWEEP" and direction=="SELL"):
             score += 20; reasons.append(f"Liquidity Sweep 🔥")
@@ -468,52 +468,62 @@ def score_signal():
     if ob:
         if (ob["type"]=="BULLISH_OB" and direction=="BUY") or (ob["type"]=="BEARISH_OB" and direction=="SELL"):
             score += 15; reasons.append(f"Order Block")
- 
+
     if candle and candle_score > 0:
         bullish = ["Bullish Engulfing","Hammer","Pin Bar Haussier"]
         bearish = ["Bearish Engulfing","Shooting Star","Pin Bar Baissier"]
         if (any(p in candle for p in bullish) and direction=="BUY") or \
            (any(p in candle for p in bearish) and direction=="SELL"):
             score += candle_score; reasons.append(candle)
- 
+
     if vol_ratio >= 2.5: score += 15; reasons.append(f"Volume x{vol_ratio} 🔥")
     elif vol_ratio >= 1.5: score += 8; reasons.append(f"Volume x{vol_ratio}")
- 
+
     if psych["dist_up"] < 2.0 or psych["dist_dn"] < 2.0:
         score += 8; reasons.append(f"Niveau psychologique")
- 
+
     if state.consecutive_losses >= 3: score -= 20
     if not session["active"]: score -= 15
- 
+
     score = max(0, min(score, 100))
     if score < MIN_SCORE: return None
- 
+
     leverage, lev_label, lev_emoji = get_leverage(score)
- 
+
     atr_sl = 1.2 if "OVERLAP" in session["name"] else 1.5
+    atr_val = max(atr, 1.5)  # ATR minimum de 1.5 points
+    
     if direction=="BUY":
-        sl  = round(price - atr*atr_sl, 2)
-        tp1 = round(price + atr*1.0, 2)
-        tp2 = round(price + atr*2.0, 2)
-        tp3 = round(price + atr*3.5, 2)
+        sl  = round(price - atr_val * atr_sl, 2)   # SL toujours EN DESSOUS
+        tp1 = round(price + atr_val * 1.0, 2)       # TP toujours AU DESSUS
+        tp2 = round(price + atr_val * 2.0, 2)
+        tp3 = round(price + atr_val * 3.5, 2)
+        # Vérification absolue
+        assert sl < price, f"SL {sl} doit être < prix {price}"
+        assert tp1 > price, f"TP1 {tp1} doit être > prix {price}"
     else:
-        sl  = round(price + atr*atr_sl, 2)
-        tp1 = round(price - atr*1.0, 2)
-        tp2 = round(price - atr*2.0, 2)
-        tp3 = round(price - atr*3.5, 2)
- 
-    if direction=="BUY" and abs(psych["above"]-tp2) < atr: tp2 = psych["above"]
-    elif direction=="SELL" and abs(psych["below"]-tp2) < atr: tp2 = psych["below"]
- 
+        sl  = round(price + atr_val * atr_sl, 2)   # SL toujours AU DESSUS
+        tp1 = round(price - atr_val * 1.0, 2)       # TP toujours EN DESSOUS
+        tp2 = round(price - atr_val * 2.0, 2)
+        tp3 = round(price - atr_val * 3.5, 2)
+        # Vérification absolue
+        assert sl > price, f"SL {sl} doit être > prix {price}"
+        assert tp1 < price, f"TP1 {tp1} doit être < prix {price}"
+
+    if direction=="BUY" and psych["above"] > price and abs(psych["above"]-tp2) < atr_val:
+        tp2 = psych["above"]
+    elif direction=="SELL" and psych["below"] < price and abs(psych["below"]-tp2) < atr_val:
+        tp2 = psych["below"]
+
     rr = round(abs(tp2-price)/max(abs(sl-price),0.01), 1)
     trade_amount = ACCOUNT_SIZE * (TRADE_AMOUNT_PERCENT/100)
     exposure = trade_amount * leverage
     risk_amount = round(ACCOUNT_SIZE * RISK_PERCENT/100, 2)
     gain_tp2 = round(risk_amount * rr, 2)
- 
+
     # Taille de position OKX (1 contrat = 1 oz d'or)
     size = max(1, int(exposure / price))
- 
+
     return {
         "direction": direction, "entry": price,
         "sl": sl, "tp1": tp1, "tp2": tp2, "tp3": tp3,
@@ -526,7 +536,7 @@ def score_signal():
         "risk_amount": risk_amount, "gain_tp2": gain_tp2,
         "vol_ratio": vol_ratio, "size": size,
     }
- 
+
 # ═══════════════════════════════════════════════════════════════
 # VÉRIFICATION SORTIE
 # ═══════════════════════════════════════════════════════════════
@@ -535,11 +545,11 @@ def check_exit(current_price):
     t = state.current_trade
     d = t["direction"]
     elapsed = time.time() - t["open_time"]
- 
+
     if elapsed >= MAX_TRADE_DURATION:
         pnl = round(current_price-t["entry"] if d=="BUY" else t["entry"]-current_price, 2)
         return {"reason": "TIMEOUT 15MIN", "price": current_price, "pnl": pnl, "emoji": "⏰"}
- 
+
     if d=="BUY":
         if current_price <= t["sl"]: return {"reason":"STOP LOSS","price":current_price,"pnl":round(current_price-t["entry"],2),"emoji":"🛑"}
         if current_price >= t["tp3"]: return {"reason":"TP3 MAX","price":current_price,"pnl":round(current_price-t["entry"],2),"emoji":"🏆"}
@@ -551,7 +561,7 @@ def check_exit(current_price):
         if current_price <= t["tp2"]: return {"reason":"TP2 ATTEINT","price":current_price,"pnl":round(t["entry"]-current_price,2),"emoji":"🎯"}
         if current_price <= t["tp1"]: return {"reason":"TP1 ATTEINT","price":current_price,"pnl":round(t["entry"]-current_price,2),"emoji":"✅"}
     return None
- 
+
 # ═══════════════════════════════════════════════════════════════
 # TELEGRAM
 # ═══════════════════════════════════════════════════════════════
@@ -566,13 +576,13 @@ async def send_telegram(session_http, message):
     except Exception as e:
         print(f"❌ Telegram: {e}")
         return False
- 
+
 async def send_entry_notification(session_http, signal, order_id):
     is_buy = signal["direction"] == "BUY"
     arrow = "📈" if is_buy else "📉"
     action = "ACHETÉ" if is_buy else "VENDU"
     confluences = "\n".join([f"  ✓ {r}" for r in signal["reasons"][:8]])
- 
+
     msg = f"""{arrow} <b>TRADE OUVERT AUTOMATIQUEMENT !</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━
 {signal['lev_emoji']} <b>{action} XAUUSD</b> — Levier {signal['leverage']}x
@@ -591,14 +601,14 @@ async def send_entry_notification(session_http, signal, order_id):
 ━━━━━━━━━━━━━━━━━━━━━━━━
 {signal['session']['emoji']} {signal['session']['name']} | DXY: {signal['dxy_trend']}
 {f"🕯️ {signal['candle']}" if signal['candle'] else ""}
- 
+
 <b>Confluences :</b>
 {confluences}
 ━━━━━━━━━━━━━━━━━━━━━━━━
 ⏳ <i>Je surveille et ferme automatiquement...</i>"""
- 
+
     await send_telegram(session_http, msg)
- 
+
 async def send_exit_notification(session_http, exit_info):
     t = state.current_trade
     pnl = exit_info["pnl"]
@@ -607,13 +617,13 @@ async def send_exit_notification(session_http, exit_info):
     mins, secs = duration//60, duration%60
     pnl_dollar = round(abs(pnl) * 0.01 * t["leverage"], 2)
     win_rate = round(state.wins / max(1, state.wins+state.losses) * 100)
- 
+
     if "STOP" in exit_info["reason"]: header = "🛑 <b>STOP LOSS — TRADE FERMÉ AUTO</b>"
     elif "TP3" in exit_info["reason"]: header = "🏆 <b>TP3 MAXIMUM — TRADE FERMÉ AUTO !</b>"
     elif "TP2" in exit_info["reason"]: header = "🎯 <b>TP2 ATTEINT — TRADE FERMÉ AUTO !</b>"
     elif "TP1" in exit_info["reason"]: header = "✅ <b>TP1 ATTEINT — TRADE FERMÉ AUTO !</b>"
     else: header = "⏰ <b>TIMEOUT — TRADE FERMÉ AUTO</b>"
- 
+
     msg = f"""{header}
 ━━━━━━━━━━━━━━━━━━━━━━━━
 💱 {t['direction']} | Levier {t['leverage']}x
@@ -626,36 +636,36 @@ async def send_exit_notification(session_http, exit_info):
 💹 P&L Total : {'+' if state.total_pnl>=0 else ''}{state.total_pnl:.2f} pts
 ━━━━━━━━━━━━━━━━━━━━━━━━
 🔍 <i>Prochain signal en cours d'analyse...</i>"""
- 
+
     await send_telegram(session_http, msg)
- 
+
 # ═══════════════════════════════════════════════════════════════
 # BOUCLE PRINCIPALE
 # ═══════════════════════════════════════════════════════════════
 async def main():
     print("🚀 XAUUSD AUTO TRADE BOT V3.0")
- 
+
     async with aiohttp.ClientSession() as http:
- 
+
         await send_telegram(http, """🤖 <b>XAUUSD AUTO TRADE BOT V3.0 — ACTIF</b>
- 
+
 ⚡ <b>100% AUTOMATIQUE</b>
 Je trade tout seul sur OKX.
 Tu reçois juste les notifications.
- 
+
 💎 Levier dynamique :
 ⚡ Score 78-84 → 2x
 🔥 Score 85-91 → 3x
 🔥🔥 Score 92-96 → 5x
 💎 Score 97-100 → 10x
- 
+
 🎯 Un seul trade à la fois
 ⏱️ Timeout 15 min automatique
 🛑 SL/TP placés automatiquement
- 
+
 <i>Tu n'as plus rien à faire — je gère tout.</i>
 🔍 <i>Analyse en cours...</i>""")
- 
+
         # Chargement initial
         for _ in range(60):
             p = await get_gold_price(http)
@@ -663,35 +673,35 @@ Tu reçois juste les notifications.
             state.volumes.append(random.randint(80, 200))
             state.last_price = p
             await asyncio.sleep(0.05)
- 
+
         for _ in range(5):
             state.dxy_prices.append(await get_dxy_price(http))
         state.us10y_val = await get_us10y(http)
- 
+
         print(f"✅ Prix: {state.last_price} | DXY: {state.dxy_prices[-1]:.2f} | US10Y: {state.us10y_val:.2f}%")
- 
+
         # ═══ DIAGNOSTIC COMPLET AU DÉMARRAGE ═══
         diag = []
- 
+
         # 1. Test prix OKX
         test_price = await get_gold_price(http)
         if test_price and test_price > 1000:
             diag.append(("✅", f"Prix OKX connecté : <b>{test_price}$</b>"))
         else:
             diag.append(("❌", "Prix OKX — connexion échouée"))
- 
+
         # 2. Test DXY
         if state.dxy_prices and state.dxy_prices[-1] > 0:
             diag.append(("✅", f"DXY connecté : <b>{state.dxy_prices[-1]:.2f}</b>"))
         else:
             diag.append(("❌", "DXY — données non reçues"))
- 
+
         # 3. Test US10Y
         if state.us10y_val > 0:
             diag.append(("✅", f"US10Y connecté : <b>{state.us10y_val:.2f}%</b>"))
         else:
             diag.append(("❌", "US10Y — données non reçues"))
- 
+
         # 4. Test API OKX — vérifier solde
         try:
             path = "/api/v5/account/balance?ccy=USDC"
@@ -708,14 +718,14 @@ Tu reçois juste les notifications.
                     diag.append(("⚠️", f"API OKX — {data.get('msg', 'Erreur inconnue')}"))
         except Exception as e:
             diag.append(("❌", f"API OKX — {str(e)[:50]}"))
- 
+
         # 5. Session actuelle
         session = detect_session()
         if session["active"]:
             diag.append(("✅", f"Session <b>{session['name']}</b> {session['emoji']} — Trading actif"))
         else:
             diag.append(("⚠️", f"Session <b>{session['name']}</b> — Liquidité faible"))
- 
+
         # 6. Symbole OKX
         try:
             url = f"{OKX_BASE_URL}/api/v5/market/ticker?instId={SYMBOL}"
@@ -728,18 +738,18 @@ Tu reçois juste les notifications.
                     diag.append(("❌", f"Symbole {SYMBOL} non disponible sur OKX"))
         except:
             diag.append(("❌", f"Symbole {SYMBOL} — vérification échouée"))
- 
+
         # Construire le message diagnostic
         diag_lines = "\n".join([f"{icon} {msg}" for icon, msg in diag])
         all_ok = all(icon == "✅" for icon, _ in diag)
         status = "🟢 <b>TOUT EST OPÉRATIONNEL</b>" if all_ok else "🟡 <b>OPÉRATIONNEL AVEC AVERTISSEMENTS</b>"
- 
+
         await send_telegram(http, f"""🔍 <b>DIAGNOSTIC SYSTÈME</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━
 {diag_lines}
 ━━━━━━━━━━━━━━━━━━━━━━━━
 {status}
- 
+
 📊 <b>Paramètres actifs :</b>
 → Symbole : {SYMBOL}
 → Score min : {MIN_SCORE}/100
@@ -747,11 +757,11 @@ Tu reçois juste les notifications.
 → Levier : dynamique 2x-10x
 → Risque/trade : {RISK_PERCENT}% du capital
 → Timeout : 15 min
- 
+
 <i>Je commence l'analyse XAUUSD...</i>""")
- 
+
         tick = 0
- 
+
         while state.running:
             try:
                 price = await get_gold_price(http)
@@ -761,29 +771,29 @@ Tu reçois juste les notifications.
                 if len(state.prices) > 500:
                     state.prices = state.prices[-500:]
                     state.volumes = state.volumes[-500:]
- 
+
                 tick += 1
- 
+
                 if tick % 30 == 0:
                     state.dxy_prices.append(await get_dxy_price(http))
                     if len(state.dxy_prices) > 20: state.dxy_prices = state.dxy_prices[-20:]
- 
+
                 if tick % 60 == 0:
                     state.us10y_val = await get_us10y(http)
- 
+
                 # Blackout news
                 news = check_news()
                 if news and not state.news_blackout_until:
                     state.news_blackout_until = datetime.now(timezone.utc) + timedelta(minutes=30)
                     await send_telegram(http, f"⚠️ <b>BLACKOUT {news}</b> — Pause 30 min")
- 
+
                 blackout, _ = is_news_blackout()
                 if blackout:
                     await asyncio.sleep(1)
                     continue
                 else:
                     state.news_blackout_until = None
- 
+
                 # EN TRADE — surveille sortie
                 if state.in_trade:
                     exit_info = check_exit(price)
@@ -792,19 +802,19 @@ Tu reçois juste les notifications.
                         closed = await okx_close_position(http, state.current_trade["direction"])
                         if not closed:
                             print("⚠️ Fermeture auto échouée — SL/TP OKX gère")
- 
+
                         if exit_info["pnl"] > 0:
                             state.wins += 1; state.consecutive_losses = 0
                         else:
                             state.losses += 1; state.consecutive_losses += 1
- 
+
                         state.total_pnl = round(state.total_pnl + exit_info["pnl"], 2)
                         await send_exit_notification(http, exit_info)
                         state.in_trade = False
                         state.current_trade = None
                         state.okx_order_id = None
                         print(f"✅ Fermé: {exit_info['reason']} | PnL: {exit_info['pnl']:.2f}")
- 
+
                 # PAS EN TRADE — scan
                 elif tick % 1 == 0:
                     session = detect_session()
@@ -812,15 +822,15 @@ Tu reçois juste les notifications.
                         if tick % 120 == 0: print(f"😴 {session['name']} — pause")
                         await asyncio.sleep(1)
                         continue
- 
+
                     signal = score_signal()
                     if signal:
                         lev = signal["leverage"]
                         print(f"🚨 {signal['direction']} @ {signal['entry']} | Score: {signal['score']}/100 | Levier: {lev}x")
- 
+
                         # Définir le levier sur OKX
                         await okx_set_leverage(http, lev)
- 
+
                         # Placer l'ordre sur OKX
                         order_id = await okx_place_order(
                             http,
@@ -830,7 +840,7 @@ Tu reçois juste les notifications.
                             signal["tp2"],
                             signal["entry"]
                         )
- 
+
                         if order_id:
                             state.in_trade = True
                             state.okx_order_id = order_id
@@ -840,15 +850,15 @@ Tu reçois juste les notifications.
                             print("❌ Ordre échoué — skip ce signal")
                     else:
                         if tick % 60 == 0: print(f"🔍 Scan #{tick} — Pas de setup")
- 
+
                 await asyncio.sleep(1)
- 
+
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 error_msg = str(e)
                 print(f"❌ Erreur: {error_msg}")
- 
+
                 # Diagnostic automatique
                 if "401" in error_msg or "Invalid" in error_msg or "sign" in error_msg.lower():
                     advice = "🔑 Problème de clé API OKX\n→ Vérifie OKX_API_KEY, OKX_SECRET, OKX_PASSPHRASE dans Railway Variables"
@@ -862,15 +872,15 @@ Tu reçois juste les notifications.
                     advice = "📊 Problème de position\n→ Vérifie sur OKX si une position est déjà ouverte\n→ Ferme-la manuellement si besoin"
                 else:
                     advice = f"⚠️ Erreur inconnue\n→ Redémarre le service Railway si ça persiste"
- 
+
                 await send_telegram(http, f"""🚨 <b>ERREUR DÉTECTÉE — BOT EN PAUSE</b>
- 
+
 ❌ <b>Erreur :</b> <code>{error_msg[:200]}</code>
- 
+
 {advice}
- 
+
 ⏳ <i>Reprise automatique dans 30 secondes...</i>""")
                 await asyncio.sleep(30)
- 
+
 if __name__ == "__main__":
     asyncio.run(main())
