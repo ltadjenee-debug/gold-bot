@@ -115,11 +115,22 @@ async def okx_set_leverage(session, leverage):
         print(f"❌ Set leverage error: {e}")
         return False
  
-async def okx_place_order(session, direction, size, sl, tp):
+async def okx_place_order(session, direction, size, sl, tp, entry_price=0):
     """Place un ordre sur OKX avec SL et TP"""
     path = "/api/v5/trade/order"
     side = "buy" if direction == "BUY" else "sell"
     pos_side = "long" if direction == "BUY" else "short"
+ 
+    # Vérification SL/TP cohérents
+    sl = round(sl, 2)
+    tp = round(tp, 2)
+    
+    if direction == "BUY":
+        if sl >= float(entry_price): sl = round(float(entry_price) - 1.5, 2)
+        if tp <= float(entry_price): tp = round(float(entry_price) + 2.0, 2)
+    else:
+        if sl <= float(entry_price): sl = round(float(entry_price) + 1.5, 2)
+        if tp >= float(entry_price): tp = round(float(entry_price) - 2.0, 2)
  
     body = json.dumps({
         "instId": SYMBOL,
@@ -810,7 +821,8 @@ Tu reçois juste les notifications.
                             signal["direction"],
                             signal["size"],
                             signal["sl"],
-                            signal["tp2"]
+                            signal["tp2"],
+                            signal["entry"]
                         )
  
                         if order_id:
