@@ -120,20 +120,34 @@ async def okx_place_order(session, direction, size, sl, tp, entry_price=0):
     side = "buy" if direction == "BUY" else "sell"
     pos_side = "long" if direction == "BUY" else "short"
 
-    # Correction SL/TP forcée selon direction
+    # Récupère le prix de marché ACTUEL juste avant l'ordre (évite SL/TP obsolètes)
+    try:
+        ticker_url = f"{OKX_BASE_URL}/api/v5/market/ticker?instId={SYMBOL}"
+        async with session.get(ticker_url, timeout=aiohttp.ClientTimeout(total=5)) as r:
+            ticker_data = await r.json()
+            if ticker_data.get("code") == "0":
+                fresh_price = float(ticker_data["data"][0]["last"])
+                # Recalcule SL/TP en conservant la même DISTANCE que prévu, mais depuis le prix frais
+                sl_distance = abs(float(entry_price) - float(sl))
+                tp_distance = abs(float(entry_price) - float(tp))
+                entry_price = fresh_price
+    except Exception as e:
+        print(f"⚠️ Impossible de rafraîchir le prix, utilisation du prix du signal: {e}")
+        sl_distance = abs(float(entry_price) - float(sl))
+        tp_distance = abs(float(entry_price) - float(tp))
+
+    # Correction SL/TP forcée selon direction, avec le prix FRAIS et la distance d'origine
     entry_price = float(entry_price)
-    sl = float(sl)
-    tp = float(tp)
-    
+
     if direction == "BUY":
-        sl = round(entry_price - abs(entry_price - sl), 2)
-        tp = round(entry_price + abs(entry_price - tp), 2)
+        sl = round(entry_price - sl_distance, 2)
+        tp = round(entry_price + tp_distance, 2)
         # Sécurité absolue
         if sl >= entry_price: sl = round(entry_price - 2.0, 2)
         if tp <= entry_price: tp = round(entry_price + 3.0, 2)
     else:
-        sl = round(entry_price + abs(entry_price - sl), 2)
-        tp = round(entry_price - abs(entry_price - tp), 2)
+        sl = round(entry_price + sl_distance, 2)
+        tp = round(entry_price - tp_distance, 2)
         # Sécurité absolue
         if sl <= entry_price: sl = round(entry_price + 2.0, 2)
         if tp >= entry_price: tp = round(entry_price - 3.0, 2)
