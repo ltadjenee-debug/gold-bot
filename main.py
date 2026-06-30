@@ -874,6 +874,23 @@ Tu reçois juste les notifications.
         except Exception as e:
             diag.append(("⚠️", f"Liste instruments — {str(e)[:50]}"))
 
+        # 8. Liste les contrats X-Perp (FUTURES, ruleType=xperp) pour XAU — produit MiCA conforme EU
+        try:
+            url = f"{OKX_BASE_URL}/api/v5/public/instruments?instType=FUTURES"
+            async with http.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
+                data = await r.json()
+                if data.get("code") == "0":
+                    xperp_xau = [(i["instId"], i.get("state", "?"), i.get("ruleType", "?")) for i in data["data"] if "XAU" in i["instId"]]
+                    xperp_all = [(i["instId"], i.get("ruleType", "?")) for i in data["data"] if i.get("ruleType") == "xperp"]
+                    if xperp_xau:
+                        formatted = ", ".join([f"{iid}({st},{rt})" for iid, st, rt in xperp_xau])
+                        diag.append(("🎯", f"X-Perp XAU trouvés : {formatted}"))
+                    else:
+                        diag.append(("⚠️", "Aucun X-Perp XAU trouvé"))
+                    diag.append(("ℹ️", f"Total X-Perp disponibles : {len(xperp_all)} contrats"))
+        except Exception as e:
+            diag.append(("⚠️", f"Liste X-Perp — {str(e)[:50]}"))
+
         # Construire le message diagnostic
         diag_lines = "\n".join([f"{icon} {msg}" for icon, msg in diag])
         all_ok = all(icon == "✅" for icon, _ in diag)
