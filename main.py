@@ -33,7 +33,7 @@ RISK_PERCENT         = 2.0
 TRADE_AMOUNT_PERCENT = 10
 MIN_SCORE            = 78
 MAX_TRADE_DURATION   = 15 * 60
-SYMBOL               = "BTC-USDC-SWAP"  # Bitcoin perpétuel — pas de restriction MiCA
+SYMBOL               = "BTC-USDT-SWAP"  # Contrat confirmé live sur OKX (test restriction MiCA)
 
 LEVERAGE_TABLE = [
     (97, 101, 10, "SETUP EN BÉTON",   "💎"),
