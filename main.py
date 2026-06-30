@@ -535,7 +535,7 @@ def score_signal():
 
     # Taille de position OKX BTC-USDC-SWAP
     # 1 contrat BTC-USDC-SWAP = 0.01 BTC sur OKX — taille minimale exprimée en contrats
-    contract_value_btc = 0.01
+    contract_value_btc = 0.0001  # 1 contrat BTC-USDT-SWAP = 0.0001 BTC (confirmé OKX)
     btc_amount = exposure / price
     size = max(1, round(btc_amount / contract_value_btc))
 
