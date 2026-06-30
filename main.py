@@ -1,6 +1,6 @@
 """
 ╔══════════════════════════════════════════════════════════════════╗
-║     XAUUSD ULTIMATE SCALPING BOT — VERSION 3.0 AUTO TRADE       ║
+║      BTCUSD ULTIMATE SCALPING BOT — VERSION 4.0 AUTO TRADE      ║
 ║        100% AUTOMATIQUE — OKX API — LEVIER DYNAMIQUE            ║
 ╚══════════════════════════════════════════════════════════════════╝
 """
@@ -33,7 +33,7 @@ RISK_PERCENT         = 2.0
 TRADE_AMOUNT_PERCENT = 10
 MIN_SCORE            = 78
 MAX_TRADE_DURATION   = 15 * 60
-SYMBOL               = "XAU-USDT-SWAP"  # Seul contrat confirmé existant sur OKX
+SYMBOL               = "BTC-USDC-SWAP"  # Bitcoin perpétuel — pas de restriction MiCA
 
 LEVERAGE_TABLE = [
     (97, 101, 10, "SETUP EN BÉTON",   "💎"),
@@ -141,7 +141,7 @@ async def okx_place_order(session, direction, size, sl, tp, entry_price=0):
     body = json.dumps({
         "instId": SYMBOL,
         "tdMode": "cross",
-        "ccy": "USD",
+        "ccy": "USDC",
         "side": side,
         "posSide": pos_side,
         "ordType": "market",
@@ -222,7 +222,7 @@ async def okx_get_position(session):
 # PRIX EN TEMPS RÉEL
 # ═══════════════════════════════════════════════════════════════
 async def get_gold_price(session):
-    """Prix XAUUSD directement depuis OKX — 100% synchronisé"""
+    """Prix BTC directement depuis OKX — 100% synchronisé"""
     try:
         url = f"{OKX_BASE_URL}/api/v5/market/ticker?instId={SYMBOL}"
         async with session.get(url, timeout=aiohttp.ClientTimeout(total=8)) as r:
@@ -242,7 +242,7 @@ async def get_gold_price(session):
                 return round(float(data["chart"]["result"][0]["meta"]["regularMarketPrice"]), 2)
     except:
         pass
-    base = state.last_price if state.last_price > 0 else 4073.0
+    base = state.last_price if state.last_price > 0 else 100000.0
     return round(base + (random.random() - 0.499) * 0.6, 2)
 
 async def get_dxy_price(session):
@@ -274,7 +274,7 @@ async def get_us10y(session):
 # ═══════════════════════════════════════════════════════════════
 def calc_ema(prices, period):
     if len(prices) < period:
-        return prices[-1] if prices else 4073.0
+        return prices[-1] if prices else 100000.0
     k = 2 / (period + 1)
     ema = sum(prices[:period]) / period
     for p in prices[period:]:
@@ -308,7 +308,7 @@ def calc_macd(prices):
 
 def calc_bollinger(prices, period=20):
     if len(prices) < period:
-        p = prices[-1] if prices else 4073
+        p = prices[-1] if prices else 100000
         return {"upper": p+5, "middle": p, "lower": p-5}
     sl = prices[-period:]
     mid = sum(sl) / period
@@ -372,10 +372,11 @@ def detect_order_block(prices):
     return None
 
 def get_psych_levels(price):
-    l50_up = math.ceil(price/50)*50
-    l50_dn = math.floor(price/50)*50
-    return {"above": round(l50_up,2), "below": round(l50_dn,2),
-            "dist_up": round(l50_up-price,2), "dist_dn": round(price-l50_dn,2)}
+    step = 500  # niveaux ronds pertinents pour BTC (tous les 500$)
+    l_up = math.ceil(price/step)*step
+    l_dn = math.floor(price/step)*step
+    return {"above": round(l_up,2), "below": round(l_dn,2),
+            "dist_up": round(l_up-price,2), "dist_dn": round(price-l_dn,2)}
 
 def analyze_dxy(dxy_prices):
     if len(dxy_prices) < 3: return "NEUTRE", 0
@@ -531,8 +532,17 @@ def score_signal():
     risk_amount = round(ACCOUNT_SIZE * RISK_PERCENT/100, 2)
     gain_tp2 = round(risk_amount * rr, 2)
 
-    # Taille de position OKX (1 contrat = 1 oz d'or)
-    size = max(1, int(exposure / price))
+    # Taille de position OKX BTC-USDC-SWAP
+    # 1 contrat BTC-USDC-SWAP = 0.01 BTC sur OKX — taille minimale exprimée en contrats
+    contract_value_btc = 0.01
+    btc_amount = exposure / price
+    size = max(1, round(btc_amount / contract_value_btc))
+
+    # Sécurité — si 1 contrat minimum dépasse largement l'exposition voulue,
+    # le risque réel est trop élevé pour ce capital, on annule le signal
+    real_exposure = size * contract_value_btc * price
+    if real_exposure > trade_amount * leverage * 2.5:
+        return None  # Position minimale OKX trop grosse pour ce capital
 
     return {
         "direction": direction, "entry": price,
@@ -609,7 +619,7 @@ async def send_entry_notification(session_http, signal, order_id):
 
     msg = f"""{arrow} <b>TRADE OUVERT AUTOMATIQUEMENT !</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━
-{signal['lev_emoji']} <b>{action} XAUUSD</b> — Levier {signal['leverage']}x
+{signal['lev_emoji']} <b>{action} BTC</b> — Levier {signal['leverage']}x
 <i>{signal['lev_label']} (Score {signal['score']}/100)</i>
 ━━━━━━━━━━━━━━━━━━━━━━━━
 📍 <b>Entrée :</b> <code>{signal['entry']}</code>
@@ -748,11 +758,11 @@ Vérifie les Deploy Logs Railway pour le détail de l'erreur exacte (code sCode)
 # BOUCLE PRINCIPALE
 # ═══════════════════════════════════════════════════════════════
 async def main():
-    print("🚀 XAUUSD AUTO TRADE BOT V3.0")
+    print("🚀 BTC AUTO TRADE BOT V4.0")
 
     async with aiohttp.ClientSession() as http:
 
-        await send_telegram(http, """🤖 <b>XAUUSD AUTO TRADE BOT V3.0 — ACTIF</b>
+        await send_telegram(http, """🤖 <b>BTC AUTO TRADE BOT V4.0 — ACTIF</b>
 
 ⚡ <b>100% AUTOMATIQUE</b>
 Je trade tout seul sur OKX.
@@ -881,7 +891,7 @@ Tu reçois juste les notifications.
 → Risque/trade : {RISK_PERCENT}% du capital
 → Timeout : 15 min
 
-<i>Je commence l'analyse XAUUSD...</i>""")
+<i>Je commence l'analyse BTC...</i>""")
 
         # Test de placement d'ordre désactivé — attente d'un signal naturel
         # await asyncio.sleep(10)
