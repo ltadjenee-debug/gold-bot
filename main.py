@@ -115,7 +115,7 @@ async def okx_set_leverage(session, leverage):
         return False
 
 async def okx_place_order(session, direction, size, sl, tp, entry_price=0):
-    """Place un ordre sur OKX avec SL et TP"""
+    """Place un ordre sur OKX avec SL et TP — essaie USDT puis USDC si restriction"""
     path = "/api/v5/trade/order"
     side = "buy" if direction == "BUY" else "sell"
     pos_side = "long" if direction == "BUY" else "short"
@@ -170,7 +170,11 @@ async def okx_place_order(session, direction, size, sl, tp, entry_price=0):
                 print(f"✅ Ordre placé: {order_id}")
                 return order_id
             else:
+                err = data.get("data", [{}])[0] if data.get("data") else {}
+                scode = err.get("sCode", "")
                 print(f"❌ Ordre échoué: {data}")
+                if scode == "51155":
+                    print("🚫 RESTRICTION COMPLIANCE — ce contrat n'est pas tradable depuis l'Europe sur ce compte. Voir diagnostic /api/v5/public/instruments")
                 return None
     except Exception as e:
         print(f"❌ Place order error: {e}")
@@ -802,6 +806,20 @@ Tu reçois juste les notifications.
                     diag.append(("❌", f"Symbole {SYMBOL} non disponible sur OKX"))
         except:
             diag.append(("❌", f"Symbole {SYMBOL} — vérification échouée"))
+
+        # 7. Liste tous les contrats XAU réellement tradables (pour diagnostic compliance)
+        try:
+            url = f"{OKX_BASE_URL}/api/v5/public/instruments?instType=SWAP"
+            async with http.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
+                data = await r.json()
+                if data.get("code") == "0":
+                    xau_instruments = [i["instId"] for i in data["data"] if "XAU" in i["instId"]]
+                    if xau_instruments:
+                        diag.append(("ℹ️", f"Contrats XAU trouvés : {', '.join(xau_instruments)}"))
+                    else:
+                        diag.append(("⚠️", "Aucun contrat XAU SWAP trouvé sur OKX"))
+        except Exception as e:
+            diag.append(("⚠️", f"Liste instruments — {str(e)[:50]}"))
 
         # Construire le message diagnostic
         diag_lines = "\n".join([f"{icon} {msg}" for icon, msg in diag])
