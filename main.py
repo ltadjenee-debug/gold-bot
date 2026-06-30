@@ -33,7 +33,7 @@ RISK_PERCENT         = 2.0
 TRADE_AMOUNT_PERCENT = 10
 MIN_SCORE            = 78
 MAX_TRADE_DURATION   = 15 * 60
-SYMBOL               = "XAU-USDC-SWAP"  # Contrat perpétuel OKX — USDC requis pour résidents EEE
+SYMBOL               = "XAU-USDT-SWAP"  # Seul contrat confirmé existant sur OKX
 
 LEVERAGE_TABLE = [
     (97, 101, 10, "SETUP EN BÉTON",   "💎"),
@@ -141,7 +141,7 @@ async def okx_place_order(session, direction, size, sl, tp, entry_price=0):
     body = json.dumps({
         "instId": SYMBOL,
         "tdMode": "cross",
-        "ccy": "USDC",
+        "ccy": "USD",
         "side": side,
         "posSide": pos_side,
         "ordType": "market",
@@ -708,6 +708,43 @@ async def check_spread(session_http):
     return True, 0
 
 # ═══════════════════════════════════════════════════════════════
+# TEST MANUEL — Vérifie si le placement d'ordre fonctionne
+# ═══════════════════════════════════════════════════════════════
+async def test_order_placement(session_http):
+    """Place un micro-ordre de test pour vérifier que tout fonctionne,
+    puis le ferme immédiatement. Coûte quasi rien (taille minimale)."""
+    await send_telegram(session_http, "🧪 <b>TEST EN COURS</b> — Tentative d'ordre minimal sur OKX...")
+
+    price = state.last_price
+    test_sl = round(price - 3.0, 2)
+    test_tp = round(price + 3.0, 2)
+
+    # Set levier minimal
+    await okx_set_leverage(session_http, 2)
+
+    order_id = await okx_place_order(session_http, "BUY", 1, test_sl, test_tp, price)
+
+    if order_id:
+        await send_telegram(session_http, f"""✅ <b>TEST RÉUSSI !</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+Ordre placé avec succès sur OKX.
+🆔 Order ID : <code>{order_id}</code>
+📍 Prix : {price}
+
+Le bot PEUT trader réellement.
+Fermeture du test dans 5 secondes...""")
+        await asyncio.sleep(5)
+        closed = await okx_close_position(session_http, "BUY")
+        await send_telegram(session_http, f"{'✅' if closed else '⚠️'} Position de test fermée.")
+        return True
+    else:
+        await send_telegram(session_http, """❌ <b>TEST ÉCHOUÉ</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+Le placement d'ordre a échoué.
+Vérifie les Deploy Logs Railway pour le détail de l'erreur exacte (code sCode).""")
+        return False
+
+# ═══════════════════════════════════════════════════════════════
 # BOUCLE PRINCIPALE
 # ═══════════════════════════════════════════════════════════════
 async def main():
@@ -772,18 +809,22 @@ Tu reçois juste les notifications.
 
         # 4. Test API OKX — vérifier solde
         try:
-            path = "/api/v5/account/balance?ccy=USDC"
-            async with http.get(
-                OKX_BASE_URL + path,
-                headers=okx_headers("GET", path),
-                timeout=aiohttp.ClientTimeout(total=10)
-            ) as r:
-                data = await r.json()
-                if data.get("code") == "0":
-                    balance = float(data["data"][0]["details"][0]["availBal"]) if data["data"][0].get("details") else 0
-                    diag.append(("✅", f"API OKX connectée — Solde USDC : <b>{balance:.2f}$</b>"))
-                else:
-                    diag.append(("⚠️", f"API OKX — {data.get('msg', 'Erreur inconnue')}"))
+            for ccy_check in ["USD", "USDC", "USDT"]:
+                try:
+                    path = f"/api/v5/account/balance?ccy={ccy_check}"
+                    async with http.get(
+                        OKX_BASE_URL + path,
+                        headers=okx_headers("GET", path),
+                        timeout=aiohttp.ClientTimeout(total=10)
+                    ) as r:
+                        data = await r.json()
+                        if data.get("code") == "0" and data["data"][0].get("details"):
+                            balance = float(data["data"][0]["details"][0]["availBal"])
+                            diag.append(("✅", f"Solde {ccy_check} : <b>{balance:.2f}</b>"))
+                        else:
+                            diag.append(("ℹ️", f"Solde {ccy_check} : 0 ou indisponible"))
+                except Exception as e:
+                    diag.append(("⚠️", f"Solde {ccy_check} — {str(e)[:40]}"))
         except Exception as e:
             diag.append(("❌", f"API OKX — {str(e)[:50]}"))
 
@@ -841,6 +882,10 @@ Tu reçois juste les notifications.
 → Timeout : 15 min
 
 <i>Je commence l'analyse XAUUSD...</i>""")
+
+        # Test de placement d'ordre désactivé — attente d'un signal naturel
+        # await asyncio.sleep(10)
+        # await test_order_placement(http)
 
         tick = 0
 
