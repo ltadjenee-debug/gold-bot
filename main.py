@@ -33,7 +33,7 @@ RISK_PERCENT         = 2.0
 TRADE_AMOUNT_PERCENT = 10
 MIN_SCORE            = 78
 MAX_TRADE_DURATION   = 15 * 60
-SYMBOL               = "XAU-USDT-SWAP"  # Contrat perpétuel OKX
+SYMBOL               = "XAU-USDC-SWAP"  # Contrat perpétuel OKX — USDC requis pour résidents EEE
 
 LEVERAGE_TABLE = [
     (97, 101, 10, "SETUP EN BÉTON",   "💎"),
