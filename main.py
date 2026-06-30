@@ -339,7 +339,7 @@ def detect_session():
     if 13 <= h < 17: return {"name": "OVERLAP LDN/NY", "emoji": "🔥", "score_bonus": 20, "active": True}
     elif 7 <= h < 13: return {"name": "LONDON", "emoji": "🇬🇧", "score_bonus": 12, "active": True}
     elif 17 <= h < 21: return {"name": "NEW YORK", "emoji": "🗽", "score_bonus": 10, "active": True}
-    else: return {"name": "ASIA", "emoji": "🌏", "score_bonus": 2, "active": False}
+    else: return {"name": "ASIA", "emoji": "🌏", "score_bonus": 5, "active": True}
 
 def detect_liquidity_sweep(prices):
     if len(prices) < 25: return None
