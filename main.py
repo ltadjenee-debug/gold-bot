@@ -26,14 +26,14 @@ CHAT_ID = "808538037"
 OKX_API_KEY    = os.environ.get("OKX_API_KEY", "")
 OKX_SECRET     = os.environ.get("OKX_SECRET", "")
 OKX_PASSPHRASE = os.environ.get("OKX_PASSPHRASE", "")
-OKX_BASE_URL   = "https://eea.okx.com"
+OKX_BASE_URL   = "https://my.okx.eu"
 
 ACCOUNT_SIZE         = 100
 RISK_PERCENT         = 2.0
 TRADE_AMOUNT_PERCENT = 10
 MIN_SCORE            = 78
 MAX_TRADE_DURATION   = 15 * 60
-SYMBOL               = "BTC-USD-SWAP"  # Inverse perpetual margé en BTC — pas d'USDT donc pas de restriction MiCA
+SYMBOL               = "XAU-USDC-SWAP"  # Test sur my.okx.eu avec marge USDC
 
 LEVERAGE_TABLE = [
     (97, 101, 10, "SETUP EN BÉTON",   "💎"),
@@ -155,7 +155,7 @@ async def okx_place_order(session, direction, size, sl, tp, entry_price=0):
     body = json.dumps({
         "instId": SYMBOL,
         "tdMode": "cross",
-        "ccy": "USD",
+        "ccy": "USDC",
         "side": side,
         "posSide": pos_side,
         "ordType": "market",
@@ -889,21 +889,32 @@ Tu reçois juste les notifications.
             diag.append(("⚠️", f"Liste instruments — {str(e)[:50]}"))
 
         # 8. Liste les contrats X-Perp (FUTURES, ruleType=xperp) pour XAU — produit MiCA conforme EU
+        # Et bascule AUTOMATIQUEMENT le SYMBOL global si un contrat valide est trouvé
+        global SYMBOL
+        xau_xperp_found = None
         try:
             url = f"{OKX_BASE_URL}/api/v5/public/instruments?instType=FUTURES"
             async with http.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
                 data = await r.json()
                 if data.get("code") == "0":
                     xperp_xau = [(i["instId"], i.get("state", "?"), i.get("ruleType", "?")) for i in data["data"] if "XAU" in i["instId"]]
-                    xperp_all = [(i["instId"], i.get("ruleType", "?")) for i in data["data"] if i.get("ruleType") == "xperp"]
+                    xperp_all_count = len([i for i in data["data"] if i.get("ruleType") == "xperp"])
                     if xperp_xau:
                         formatted = ", ".join([f"{iid}({st},{rt})" for iid, st, rt in xperp_xau])
                         diag.append(("🎯", f"X-Perp XAU trouvés : {formatted}"))
+                        # Prend le premier contrat XAU live trouvé
+                        live_ones = [iid for iid, st, rt in xperp_xau if st == "live"]
+                        if live_ones:
+                            xau_xperp_found = live_ones[0]
                     else:
                         diag.append(("⚠️", "Aucun X-Perp XAU trouvé"))
-                    diag.append(("ℹ️", f"Total X-Perp disponibles : {len(xperp_all)} contrats"))
+                    diag.append(("ℹ️", f"Total X-Perp disponibles : {xperp_all_count} contrats"))
         except Exception as e:
             diag.append(("⚠️", f"Liste X-Perp — {str(e)[:50]}"))
+
+        if xau_xperp_found:
+            SYMBOL = xau_xperp_found
+            diag.append(("✅", f"Bascule automatique sur : <b>{SYMBOL}</b>"))
 
         # Construire le message diagnostic
         diag_lines = "\n".join([f"{icon} {msg}" for icon, msg in diag])
@@ -925,6 +936,45 @@ Tu reçois juste les notifications.
 → Timeout : 15 min
 
 <i>Je commence l'analyse BTC...</i>""")
+
+        # ═══ VÉRIFICATION COMPLIANCE OBLIGATOIRE AVANT TOUT TRADING ═══
+        # Si le symbole tombe sur l'erreur 51155 lors d'un test, on bloque
+        # le bot et on alerte clairement au lieu de spammer des tentatives.
+        compliance_blocked = False
+        try:
+            test_lev_path = "/api/v5/account/set-leverage"
+            test_body = json.dumps({"instId": SYMBOL, "lever": "2", "mgnMode": "cross"})
+            async with http.post(
+                OKX_BASE_URL + test_lev_path,
+                headers=okx_headers("POST", test_lev_path, test_body),
+                data=test_body,
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as r:
+                test_data = await r.json()
+                if test_data.get("code") != "0":
+                    err_msg = str(test_data.get("data", [{}])[0].get("sMsg", "")) if test_data.get("data") else ""
+                    if "compliance" in err_msg.lower() or "restriction" in err_msg.lower():
+                        compliance_blocked = True
+        except Exception as e:
+            print(f"⚠️ Test compliance échoué: {e}")
+
+        if compliance_blocked:
+            await send_telegram(http, f"""🛑 <b>BOT ARRÊTÉ — SYMBOLE BLOQUÉ</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+Le symbole <code>{SYMBOL}</code> est bloqué par une restriction de conformité OKX (MiCA/EEA).
+
+Le bot ne va PAS générer de signaux inutiles sur ce symbole.
+
+➡️ Action requise : changer SYMBOL dans le code vers un contrat conforme (X-Perp ou autre) avant de redéployer.
+
+Le bot reste en veille, surveillance uniquement, sans tentative de trade.""")
+            print(f"🛑 SYMBOLE {SYMBOL} BLOQUÉ PAR COMPLIANCE — Bot en veille passive")
+            # Boucle de veille passive — affiche le prix mais ne trade jamais
+            while state.running:
+                price = await get_gold_price(http)
+                state.last_price = price
+                await asyncio.sleep(30)
+            return
 
         # Test de placement d'ordre désactivé — attente d'un signal naturel
         # await asyncio.sleep(10)
