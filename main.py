@@ -556,6 +556,20 @@ def check_exit(current_price):
         pnl = round(current_price-t["entry"] if d=="BUY" else t["entry"]-current_price, 2)
         return {"reason": "TIMEOUT 15MIN", "price": current_price, "pnl": pnl, "emoji": "⏰"}
 
+    # TRAILING STOP — si TP1 atteint, on suit le prix avec un stop dynamique
+    if d == "BUY" and current_price >= t["tp1"]:
+        trailing_sl = round(current_price - t["atr"] * 0.8, 2)
+        if "trailing_sl" not in t or trailing_sl > t.get("trailing_sl", 0):
+            t["trailing_sl"] = trailing_sl
+        if current_price <= t.get("trailing_sl", 0):
+            return {"reason": "TRAILING STOP", "price": current_price, "pnl": round(current_price-t["entry"], 2), "emoji": "🔄"}
+    elif d == "SELL" and current_price <= t["tp1"]:
+        trailing_sl = round(current_price + t["atr"] * 0.8, 2)
+        if "trailing_sl" not in t or trailing_sl < t.get("trailing_sl", float("inf")):
+            t["trailing_sl"] = trailing_sl
+        if current_price >= t.get("trailing_sl", float("inf")):
+            return {"reason": "TRAILING STOP", "price": current_price, "pnl": round(t["entry"]-current_price, 2), "emoji": "🔄"}
+
     if d=="BUY":
         if current_price <= t["sl"]: return {"reason":"STOP LOSS","price":current_price,"pnl":round(current_price-t["entry"],2),"emoji":"🛑"}
         if current_price >= t["tp3"]: return {"reason":"TP3 MAX","price":current_price,"pnl":round(current_price-t["entry"],2),"emoji":"🏆"}
@@ -644,6 +658,50 @@ async def send_exit_notification(session_http, exit_info):
 🔍 <i>Prochain signal en cours d'analyse...</i>"""
 
     await send_telegram(session_http, msg)
+
+# ═══════════════════════════════════════════════════════════════
+# RAPPORT JOURNALIER
+# ═══════════════════════════════════════════════════════════════
+async def send_daily_report(session_http):
+    """Envoie un rapport journalier à 21h UTC"""
+    win_rate = round(state.wins / max(1, state.wins + state.losses) * 100)
+    total_trades = state.wins + state.losses
+
+    if total_trades == 0:
+        msg = """📊 <b>RAPPORT JOURNALIER</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+Aucun trade aujourd'hui.
+Le marché n'a pas offert de setup ≥ 78/100.
+━━━━━━━━━━━━━━━━━━━━━━━━
+🔍 Analyse reprend demain session London (07h UTC)"""
+    else:
+        msg = f"""📊 <b>RAPPORT JOURNALIER</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Victoires : {state.wins}
+❌ Pertes : {state.losses}
+🎯 Win Rate : {win_rate}%
+💹 P&L Total : {'+' if state.total_pnl >= 0 else ''}{state.total_pnl:.2f} pts
+━━━━━━━━━━━━━━━━━━━━━━━━
+💰 Solde estimé : {round(101 + state.total_pnl * 0.1, 2)}$
+🔍 Reprise demain session London (07h UTC)"""
+
+    await send_telegram(session_http, msg)
+
+async def check_spread(session_http):
+    """Vérifie que le spread OKX est acceptable"""
+    try:
+        url = f"{OKX_BASE_URL}/api/v5/market/ticker?instId={SYMBOL}"
+        async with session_http.get(url, timeout=aiohttp.ClientTimeout(total=5)) as r:
+            if r.status == 200:
+                data = await r.json()
+                if data.get("code") == "0":
+                    bid = float(data["data"][0]["bidPx"])
+                    ask = float(data["data"][0]["askPx"])
+                    spread = round(ask - bid, 2)
+                    return spread < 1.0, spread  # spread max 1 point
+    except:
+        pass
+    return True, 0
 
 # ═══════════════════════════════════════════════════════════════
 # BOUCLE PRINCIPALE
@@ -829,10 +887,18 @@ Tu reçois juste les notifications.
                         await asyncio.sleep(1)
                         continue
 
+                    # Filtre spread
+                    spread_ok, spread_val = await check_spread(http)
+                    if not spread_ok:
+                        if tick % 60 == 0:
+                            print(f"⚠️ Spread trop large: {spread_val} pts — attente")
+                        await asyncio.sleep(1)
+                        continue
+
                     signal = score_signal()
                     if signal:
                         lev = signal["leverage"]
-                        print(f"🚨 {signal['direction']} @ {signal['entry']} | Score: {signal['score']}/100 | Levier: {lev}x")
+                        print(f"🚨 {signal['direction']} @ {signal['entry']} | Score: {signal['score']}/100 | Levier: {lev}x | Spread: {spread_val}")
 
                         # Définir le levier sur OKX
                         await okx_set_leverage(http, lev)
