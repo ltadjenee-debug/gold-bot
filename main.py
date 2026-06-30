@@ -859,17 +859,18 @@ Tu reçois juste les notifications.
         except:
             diag.append(("❌", f"Symbole {SYMBOL} — vérification échouée"))
 
-        # 7. Liste tous les contrats XAU réellement tradables (pour diagnostic compliance)
+        # 7. Liste tous les contrats BTC réellement tradables avec leur état (diagnostic listing)
         try:
             url = f"{OKX_BASE_URL}/api/v5/public/instruments?instType=SWAP"
             async with http.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
                 data = await r.json()
                 if data.get("code") == "0":
-                    xau_instruments = [i["instId"] for i in data["data"] if "XAU" in i["instId"]]
-                    if xau_instruments:
-                        diag.append(("ℹ️", f"Contrats XAU trouvés : {', '.join(xau_instruments)}"))
+                    btc_instruments = [(i["instId"], i.get("state", "?")) for i in data["data"] if i["instId"].startswith("BTC-")]
+                    if btc_instruments:
+                        formatted = ", ".join([f"{iid}({st})" for iid, st in btc_instruments])
+                        diag.append(("ℹ️", f"Contrats BTC trouvés : {formatted}"))
                     else:
-                        diag.append(("⚠️", "Aucun contrat XAU SWAP trouvé sur OKX"))
+                        diag.append(("⚠️", "Aucun contrat BTC SWAP trouvé sur OKX"))
         except Exception as e:
             diag.append(("⚠️", f"Liste instruments — {str(e)[:50]}"))
 
