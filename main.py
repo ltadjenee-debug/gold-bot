@@ -230,20 +230,21 @@ async def get_gold_price(session):
                 data = await r.json()
                 if data.get("code") == "0":
                     return round(float(data["data"][0]["last"]), 2)
-    except:
-        pass
-    # Fallback Yahoo Finance
+                else:
+                    print(f"⚠️ OKX ticker error pour {SYMBOL}: {data}")
+    except Exception as e:
+        print(f"⚠️ OKX price fetch error: {e}")
+    # Fallback CoinGecko (BTC, pas Yahoo Finance / pas l'or)
     try:
-        url = "https://query1.finance.yahoo.com/v8/finance/chart/GC=F"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=8)) as r:
+        url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=8)) as r:
             if r.status == 200:
                 data = await r.json()
-                return round(float(data["chart"]["result"][0]["meta"]["regularMarketPrice"]), 2)
-    except:
-        pass
+                return round(float(data["bitcoin"]["usd"]), 2)
+    except Exception as e:
+        print(f"⚠️ CoinGecko fallback error: {e}")
     base = state.last_price if state.last_price > 0 else 100000.0
-    return round(base + (random.random() - 0.499) * 0.6, 2)
+    return round(base + (random.random() - 0.499) * 50, 2)
 
 async def get_dxy_price(session):
     try:
