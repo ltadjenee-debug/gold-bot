@@ -33,7 +33,7 @@ RISK_PERCENT         = 2.0
 TRADE_AMOUNT_PERCENT = 10
 MIN_SCORE            = 78
 MAX_TRADE_DURATION   = 15 * 60
-SYMBOL               = "BTC-USDT-SWAP"  # Contrat confirmé live sur OKX (test restriction MiCA)
+SYMBOL               = "BTC-USD-SWAP"  # Inverse perpetual margé en BTC — pas d'USDT donc pas de restriction MiCA
 
 LEVERAGE_TABLE = [
     (97, 101, 10, "SETUP EN BÉTON",   "💎"),
@@ -141,7 +141,7 @@ async def okx_place_order(session, direction, size, sl, tp, entry_price=0):
     body = json.dumps({
         "instId": SYMBOL,
         "tdMode": "cross",
-        "ccy": "USDC",
+        "ccy": "USD",
         "side": side,
         "posSide": pos_side,
         "ordType": "market",
