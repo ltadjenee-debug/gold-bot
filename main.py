@@ -773,6 +773,7 @@ Vérifie les Deploy Logs Railway pour le détail de l'erreur exacte (code sCode)
 # BOUCLE PRINCIPALE
 # ═══════════════════════════════════════════════════════════════
 async def main():
+    global SYMBOL
     print("🚀 BTC AUTO TRADE BOT V4.0")
 
     async with aiohttp.ClientSession() as http:
@@ -890,7 +891,6 @@ Tu reçois juste les notifications.
 
         # 8. Liste les contrats X-Perp (FUTURES, ruleType=xperp) pour XAU — produit MiCA conforme EU
         # Et bascule AUTOMATIQUEMENT le SYMBOL global si un contrat valide est trouvé
-        global SYMBOL
         xau_xperp_found = None
         try:
             url = f"{OKX_BASE_URL}/api/v5/public/instruments?instType=FUTURES"
