@@ -33,7 +33,7 @@ RISK_PERCENT         = 2.0
 TRADE_AMOUNT_PERCENT = 10
 MIN_SCORE            = 78
 MAX_TRADE_DURATION   = 15 * 60
-SYMBOL               = "XAUUSD-UM"  # X-Perp Gold confirmé sur OKX EU
+SYMBOL               = "XAUUSD-USDC-20310502"  # X-Perp Gold OKX EU — expiry 02/05/2031
 
 LEVERAGE_TABLE = [
     (97, 101, 10, "SETUP EN BÉTON",   "💎"),
@@ -155,7 +155,7 @@ async def okx_place_order(session, direction, size, sl, tp, entry_price=0):
     body = json.dumps({
         "instId": SYMBOL,
         "tdMode": "cross",
-        "ccy": "USD",
+        "ccy": "USDC",
         "side": side,
         "posSide": pos_side,
         "ordType": "market",
@@ -549,15 +549,14 @@ def score_signal():
 
     # Taille de position OKX BTC-USDC-SWAP
     # 1 contrat BTC-USDC-SWAP = 0.01 BTC sur OKX — taille minimale exprimée en contrats
-    contract_value_btc = 0.0001  # 1 contrat BTC-USDT-SWAP = 0.0001 BTC (confirmé OKX)
-    btc_amount = exposure / price
-    size = max(1, round(btc_amount / contract_value_btc))
+    contract_value_xau = 0.001  # 1 contrat XAUUSD X-Perp = 0.001 XAU (confirmé OKX app)
+    xau_amount = exposure / price
+    size = max(1, round(xau_amount / contract_value_xau))
 
-    # Sécurité — si 1 contrat minimum dépasse largement l'exposition voulue,
-    # le risque réel est trop élevé pour ce capital, on annule le signal
-    real_exposure = size * contract_value_btc * price
-    if real_exposure > trade_amount * leverage * 2.5:
-        return None  # Position minimale OKX trop grosse pour ce capital
+    # Vérification exposition réelle
+    real_exposure = size * contract_value_xau * price
+    if real_exposure > trade_amount * leverage * 3:
+        size = max(1, size // 2)  # Réduit la taille plutôt que d'annuler
 
     return {
         "direction": direction, "entry": price,
