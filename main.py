@@ -26,14 +26,14 @@ CHAT_ID = "808538037"
 OKX_API_KEY    = os.environ.get("OKX_API_KEY", "")
 OKX_SECRET     = os.environ.get("OKX_SECRET", "")
 OKX_PASSPHRASE = os.environ.get("OKX_PASSPHRASE", "")
-OKX_BASE_URL   = "https://my.okx.eu"
+OKX_BASE_URL   = "https://eea.okx.com"
 
 ACCOUNT_SIZE         = 100
 RISK_PERCENT         = 2.0
 TRADE_AMOUNT_PERCENT = 10
 MIN_SCORE            = 78
 MAX_TRADE_DURATION   = 15 * 60
-SYMBOL               = "XAU-USDC-SWAP"  # Test sur my.okx.eu avec marge USDC
+SYMBOL               = "XAUUSD-UM"  # X-Perp Gold confirmé sur OKX EU
 
 LEVERAGE_TABLE = [
     (97, 101, 10, "SETUP EN BÉTON",   "💎"),
@@ -155,7 +155,7 @@ async def okx_place_order(session, direction, size, sl, tp, entry_price=0):
     body = json.dumps({
         "instId": SYMBOL,
         "tdMode": "cross",
-        "ccy": "USDC",
+        "ccy": "USD",
         "side": side,
         "posSide": pos_side,
         "ordType": "market",
