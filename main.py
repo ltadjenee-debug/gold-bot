@@ -33,7 +33,7 @@ RISK_PERCENT         = 2.0
 TRADE_AMOUNT_PERCENT = 10
 MIN_SCORE            = 78
 MAX_TRADE_DURATION   = 15 * 60
-SYMBOL               = "XAUUSD-USDC-20310502"  # X-Perp Gold OKX EU — expiry 02/05/2031
+SYMBOL               = "XAU-USD_UM_XPERP-310502"  # Vrai X-Perp Gold confirmé par diagnostic
 
 LEVERAGE_TABLE = [
     (97, 101, 10, "SETUP EN BÉTON",   "💎"),
@@ -155,7 +155,7 @@ async def okx_place_order(session, direction, size, sl, tp, entry_price=0):
     body = json.dumps({
         "instId": SYMBOL,
         "tdMode": "cross",
-        "ccy": "USDC",
+        "ccy": "USD",
         "side": side,
         "posSide": pos_side,
         "ordType": "market",
@@ -773,11 +773,11 @@ Vérifie les Deploy Logs Railway pour le détail de l'erreur exacte (code sCode)
 # ═══════════════════════════════════════════════════════════════
 async def main():
     global SYMBOL
-    print("🚀 BTC AUTO TRADE BOT V4.0")
+    print("🚀 XAUUSD SIGNAL BOT")
 
     async with aiohttp.ClientSession() as http:
 
-        await send_telegram(http, """🤖 <b>BTC AUTO TRADE BOT V4.0 — ACTIF</b>
+        await send_telegram(http, """🥇 <b>XAUUSD SIGNAL BOT — ACTIF</b>
 
 ⚡ <b>100% AUTOMATIQUE</b>
 Je trade tout seul sur OKX.
