@@ -157,7 +157,6 @@ async def okx_place_order(session, direction, size, sl, tp, entry_price=0):
         "tdMode": "cross",
         "ccy": "USD",
         "side": side,
-        "posSide": pos_side,
         "ordType": "market",
         "sz": str(size),
         "attachAlgoOrds": [
