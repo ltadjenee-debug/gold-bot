@@ -911,9 +911,9 @@ Tu reçois juste les notifications.
         except Exception as e:
             diag.append(("⚠️", f"Liste X-Perp — {str(e)[:50]}"))
 
-        if xau_xperp_found:
+        if xau_xperp_found and "xperp" in xau_xperp_found.lower():
             SYMBOL = xau_xperp_found
-            diag.append(("✅", f"Bascule automatique sur : <b>{SYMBOL}</b>"))
+            diag.append(("✅", f"Bascule sur X-Perp confirmé : <b>{SYMBOL}</b>"))
 
         # Construire le message diagnostic
         diag_lines = "\n".join([f"{icon} {msg}" for icon, msg in diag])
