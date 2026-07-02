@@ -36,10 +36,10 @@ MAX_TRADE_DURATION   = 15 * 60
 SYMBOL               = "XAU-USD_UM_XPERP-310502"  # Vrai X-Perp Gold confirmé par diagnostic
 
 LEVERAGE_TABLE = [
-    (97, 101, 10, "SETUP EN BÉTON",   "💎"),
-    (92, 97,   5, "TRÈS FORT SETUP",  "🔥🔥"),
-    (85, 92,   3, "BON SETUP",        "🔥"),
-    (78, 85,   2, "SETUP CORRECT",    "⚡"),
+    (97, 101, 5, "SETUP EN BÉTON",   "💎"),
+    (92, 97,  5, "TRÈS FORT SETUP",  "🔥🔥"),
+    (85, 92,  3, "BON SETUP",        "🔥"),
+    (78, 85,  2, "SETUP CORRECT",    "⚡"),
 ]
 
 def get_leverage(score):
