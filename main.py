@@ -155,7 +155,7 @@ async def okx_place_order(session, direction, size, sl, tp, entry_price=0):
     body = json.dumps({
         "instId": SYMBOL,
         "tdMode": "cross",
-        "ccy": "USD",
+        "ccy": "USDC",
         "side": side,
         "ordType": "market",
         "sz": str(size),
