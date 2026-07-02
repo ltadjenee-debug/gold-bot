@@ -314,8 +314,8 @@ def calc_rsi(prices, period=14):
         return 100
     rs = avg_gain / avg_loss
     rsi = round(100 - 100 / (1 + rs), 1)
-    # Sanity check — si RSI est 0 ou 100, c'est suspect
-    if rsi <= 0 or rsi >= 100:
+    # Sanity check
+    if rsi <= 1 or rsi >= 99:
         return 50
     return rsi
 
@@ -673,9 +673,16 @@ async def send_exit_notification(session_http, exit_info):
     is_win = pnl > 0
     duration = int(time.time() - t["open_time"])
     mins, secs = duration//60, duration%60
-    # P&L réel : pnl en pts XAU × nb contrats × taille contrat (0.001 XAU) × prix actuel
-    contract_size = 0.001  # 1 contrat = 0.001 XAU
-    pnl_dollar = round(abs(pnl) * t.get("size", 13) * contract_size, 2)
+    # P&L réel en USDC
+    # 1 contrat = 0.001 XAU, pnl en points USD
+    contract_size = 0.001
+    nb_contracts = t.get("size", 13)
+    pnl_dollar = round(abs(pnl) * nb_contracts * contract_size, 4)
+    # Format lisible
+    if pnl_dollar < 0.01:
+        pnl_dollar_str = f"{pnl_dollar:.4f}"
+    else:
+        pnl_dollar_str = f"{pnl_dollar:.2f}"
     win_rate = round(state.wins / max(1, state.wins+state.losses) * 100)
 
     if exit_info["reason"] == "STOP LOSS": header = "🛑 <b>STOP LOSS — TRADE FERMÉ AUTO</b>"
@@ -691,7 +698,7 @@ async def send_exit_notification(session_http, exit_info):
 💱 XAUUSD {t['direction']} | Levier {t['leverage']}x
 📍 Entrée : <code>{t['entry']}</code>
 📍 Sortie : <code>{exit_info['price']}</code>
-{'💰' if is_win else '📉'} P&L : <code>{'+' if is_win else ''}{pnl:.2f} pts</code> (~{'+' if is_win else '-'}{pnl_dollar}$)
+{'💰' if is_win else '📉'} P&L : <code>{'+' if is_win else ''}{pnl:.2f} pts</code> (~{'+' if is_win else '-'}{pnl_dollar_str}$)
 ⏱️ Durée : {mins}m {secs}s
 ━━━━━━━━━━━━━━━━━━━━━━━━
 📊 Win Rate : {win_rate}% ({state.wins}W/{state.losses}L)
@@ -910,11 +917,11 @@ Tu reçois juste les notifications.
             async with http.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
                 data = await r.json()
                 if data.get("code") == "0":
-                    xperp_xau = [(i["instId"], i.get("state", "?"), i.get("ruleType", "?")) for i in data["data"] if "XAU" in i["instId"]]
+                    xperp_xau = [(i["instId"], i.get("state","?"), i.get("ruleType","?"), i.get("ctVal","?"), i.get("settleCcy","?")) for i in data["data"] if "XAU" in i["instId"]]
                     xperp_all_count = len([i for i in data["data"] if i.get("ruleType") == "xperp"])
                     if xperp_xau:
-                        formatted = ", ".join([f"{iid}({st},{rt})" for iid, st, rt in xperp_xau])
-                        diag.append(("🎯", f"X-Perp XAU trouvés : {formatted}"))
+                        formatted = "\n".join([f"{iid} | taille:{ctv} {sccy} | {st}" for iid, st, rt, ctv, sccy in xperp_xau])
+                        diag.append(("🎯", f"Contrats XAU :\n{formatted}"))
                         # Prend le premier contrat XAU live trouvé
                         live_ones = [iid for iid, st, rt in xperp_xau if st == "live"]
                         if live_ones:
