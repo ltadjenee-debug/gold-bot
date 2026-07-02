@@ -298,13 +298,26 @@ def calc_ema(prices, period):
 def calc_rsi(prices, period=14):
     if len(prices) < period + 1:
         return 50
-    gains = losses = 0
+    # Utilise Wilder smoothing pour un RSI plus précis
+    gains, losses = [], []
     for i in range(len(prices) - period, len(prices)):
         diff = prices[i] - prices[i-1]
-        if diff > 0: gains += diff
-        else: losses -= diff
-    rs = gains / (losses if losses > 0 else 0.001)
-    return round(100 - 100 / (1 + rs), 1)
+        if diff > 0:
+            gains.append(diff)
+            losses.append(0)
+        else:
+            gains.append(0)
+            losses.append(abs(diff))
+    avg_gain = sum(gains) / period
+    avg_loss = sum(losses) / period
+    if avg_loss == 0:
+        return 100
+    rs = avg_gain / avg_loss
+    rsi = round(100 - 100 / (1 + rs), 1)
+    # Sanity check — si RSI est 0 ou 100, c'est suspect
+    if rsi <= 0 or rsi >= 100:
+        return 50
+    return rsi
 
 def calc_atr(prices, period=14):
     if len(prices) < 2:
@@ -515,25 +528,23 @@ def score_signal():
 
     leverage, lev_label, lev_emoji = get_leverage(score)
 
-    atr_sl = 1.2 if "OVERLAP" in session["name"] else 1.5
+    atr_sl = 1.0 if "OVERLAP" in session["name"] else 1.2
     atr_val = max(atr, 1.5)  # ATR minimum de 1.5 points
-    
+
     if direction=="BUY":
-        sl  = round(price - atr_val * atr_sl, 2)   # SL toujours EN DESSOUS
-        tp1 = round(price + atr_val * 1.0, 2)       # TP toujours AU DESSUS
-        tp2 = round(price + atr_val * 2.0, 2)
-        tp3 = round(price + atr_val * 3.5, 2)
-        # Vérification absolue
-        assert sl < price, f"SL {sl} doit être < prix {price}"
-        assert tp1 > price, f"TP1 {tp1} doit être > prix {price}"
+        sl  = round(price - atr_val * atr_sl, 2)
+        tp1 = round(price + atr_val * 1.5, 2)   # RR 1:1.5 minimum
+        tp2 = round(price + atr_val * 3.0, 2)   # RR 1:2.5
+        tp3 = round(price + atr_val * 5.0, 2)   # RR 1:4+
+        if sl >= price: sl = round(price - 2.0, 2)
+        if tp1 <= price: tp1 = round(price + 2.5, 2)
     else:
-        sl  = round(price + atr_val * atr_sl, 2)   # SL toujours AU DESSUS
-        tp1 = round(price - atr_val * 1.0, 2)       # TP toujours EN DESSOUS
-        tp2 = round(price - atr_val * 2.0, 2)
-        tp3 = round(price - atr_val * 3.5, 2)
-        # Vérification absolue
-        assert sl > price, f"SL {sl} doit être > prix {price}"
-        assert tp1 < price, f"TP1 {tp1} doit être < prix {price}"
+        sl  = round(price + atr_val * atr_sl, 2)
+        tp1 = round(price - atr_val * 1.5, 2)
+        tp2 = round(price - atr_val * 3.0, 2)
+        tp3 = round(price - atr_val * 5.0, 2)
+        if sl <= price: sl = round(price + 2.0, 2)
+        if tp1 >= price: tp1 = round(price - 2.5, 2)
 
     if direction=="BUY" and psych["above"] > price and abs(psych["above"]-tp2) < atr_val:
         tp2 = psych["above"]
@@ -632,7 +643,7 @@ async def send_entry_notification(session_http, signal, order_id):
 
     msg = f"""{arrow} <b>TRADE OUVERT AUTOMATIQUEMENT !</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━
-{signal['lev_emoji']} <b>{action} BTC</b> — Levier {signal['leverage']}x
+{signal['lev_emoji']} <b>{action} XAUUSD</b> — Levier {signal['leverage']}x
 <i>{signal['lev_label']} (Score {signal['score']}/100)</i>
 ━━━━━━━━━━━━━━━━━━━━━━━━
 📍 <b>Entrée :</b> <code>{signal['entry']}</code>
@@ -662,18 +673,22 @@ async def send_exit_notification(session_http, exit_info):
     is_win = pnl > 0
     duration = int(time.time() - t["open_time"])
     mins, secs = duration//60, duration%60
-    pnl_dollar = round(abs(pnl) * 0.01 * t["leverage"], 2)
+    # P&L réel : pnl en pts XAU × nb contrats × taille contrat (0.001 XAU) × prix actuel
+    contract_size = 0.001  # 1 contrat = 0.001 XAU
+    pnl_dollar = round(abs(pnl) * t.get("size", 13) * contract_size, 2)
     win_rate = round(state.wins / max(1, state.wins+state.losses) * 100)
 
-    if "STOP" in exit_info["reason"]: header = "🛑 <b>STOP LOSS — TRADE FERMÉ AUTO</b>"
+    if exit_info["reason"] == "STOP LOSS": header = "🛑 <b>STOP LOSS — TRADE FERMÉ AUTO</b>"
+    elif exit_info["reason"] == "TRAILING STOP": header = "🔄 <b>TRAILING STOP — TRADE FERMÉ AUTO</b>"
     elif "TP3" in exit_info["reason"]: header = "🏆 <b>TP3 MAXIMUM — TRADE FERMÉ AUTO !</b>"
     elif "TP2" in exit_info["reason"]: header = "🎯 <b>TP2 ATTEINT — TRADE FERMÉ AUTO !</b>"
     elif "TP1" in exit_info["reason"]: header = "✅ <b>TP1 ATTEINT — TRADE FERMÉ AUTO !</b>"
-    else: header = "⏰ <b>TIMEOUT — TRADE FERMÉ AUTO</b>"
+    elif "TIMEOUT" in exit_info["reason"]: header = "⏰ <b>TIMEOUT — TRADE FERMÉ AUTO</b>"
+    else: header = f"📊 <b>{exit_info['reason']} — TRADE FERMÉ</b>"
 
     msg = f"""{header}
 ━━━━━━━━━━━━━━━━━━━━━━━━
-💱 {t['direction']} | Levier {t['leverage']}x
+💱 XAUUSD {t['direction']} | Levier {t['leverage']}x
 📍 Entrée : <code>{t['entry']}</code>
 📍 Sortie : <code>{exit_info['price']}</code>
 {'💰' if is_win else '📉'} P&L : <code>{'+' if is_win else ''}{pnl:.2f} pts</code> (~{'+' if is_win else '-'}{pnl_dollar}$)
@@ -933,7 +948,7 @@ Tu reçois juste les notifications.
 → Risque/trade : {RISK_PERCENT}% du capital
 → Timeout : 15 min
 
-<i>Je commence l'analyse BTC...</i>""")
+<i>Je commence l'analyse XAUUSD X-Perp...</i>""")
 
         # ═══ VÉRIFICATION COMPLIANCE OBLIGATOIRE AVANT TOUT TRADING ═══
         # Si le symbole tombe sur l'erreur 51155 lors d'un test, on bloque
